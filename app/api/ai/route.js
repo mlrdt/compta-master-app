@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 const SYSTEM_PROMPT = `Tu es un assistant comptable expert. Tu aides à créer des factures à partir de documents (bons de commande, contrats, devis, emails, etc.).
 
