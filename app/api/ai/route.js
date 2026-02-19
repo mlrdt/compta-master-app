@@ -119,7 +119,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json({
-      message: reply,
+      content: reply,
       invoice_data: invoiceData,
     });
   } catch (error) {
