@@ -56,6 +56,26 @@ export default function InvoicePreview({ invoice, settings = {} }) {
     });
   };
 
+  const getStatusColor = (status) => {
+    const statusColors = {
+      'draft': 'bg-gray-100 text-gray-800',
+      'sent': 'bg-blue-100 text-blue-800',
+      'paid': 'bg-green-100 text-green-800',
+      'overdue': 'bg-red-100 text-red-800'
+    };
+    return statusColors[status?.toLowerCase()] || 'bg-gray-100 text-gray-800';
+  };
+
+  // Split description into title and details if contains \n
+  const parseItemDescription = (description) => {
+    if (!description) return { title: '', details: '' };
+    const parts = description.split('\n');
+    return {
+      title: parts[0] || '',
+      details: parts.slice(1).join('\n') || ''
+    };
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2 justify-end print:hidden">
@@ -81,143 +101,177 @@ export default function InvoicePreview({ invoice, settings = {} }) {
 
       <div
         ref={previewRef}
-        className="bg-white p-8 rounded-lg shadow print:shadow-none print:rounded-none print:p-0"
+        className="bg-white rounded-lg shadow-lg print:shadow-none print:rounded-none overflow-hidden"
       >
-        {/* Header */}
-        <div className="flex justify-between mb-8 pb-6 border-b-2 border-gray-300">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{settings.company_name || 'Nom Entreprise'}</h1>
-            <p className="text-gray-600 mt-1 text-sm">{settings.company_address || 'Adresse'}</p>
-          </div>
-          <div className="text-right">
-            <h2 className="text-4xl font-bold text-indigo-600">FACTURE</h2>
-          </div>
-        </div>
-
-        {/* Company Details */}
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div className="text-sm text-gray-600 space-y-1">
-            <p>
-              <span className="font-semibold">Email:</span> {settings.company_email || 'email@example.com'}
-            </p>
-            <p>
-              <span className="font-semibold">Téléphone:</span> {settings.company_phone || ''}
-            </p>
-            {settings.trade_license && (
-              <p>
-                <span className="font-semibold">License Commercial:</span> {settings.trade_license}
+        {/* Header - Colorful indigo/violet gradient */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">FACTURE</h1>
+              <p className="text-xl font-semibold text-indigo-100">
+                {invoice.invoice_number}
               </p>
-            )}
-            {settings.trn && (
-              <p>
-                <span className="font-semibold">TRN:</span> {settings.trn}
-              </p>
-            )}
-          </div>
-
-          {/* Invoice Info Box */}
-          <div className="bg-gray-100 p-4 rounded-lg text-sm space-y-2 text-right">
-            <div>
-              <span className="font-semibold">N° facture:</span> {invoice.invoice_number}
             </div>
-            <div>
-              <span className="font-semibold">Date:</span> {formatDate(invoice.issue_date)}
-            </div>
-            <div>
-              <span className="font-semibold">Échéance:</span> {formatDate(invoice.due_date)}
-            </div>
-            <div>
-              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+            <div className="text-right">
+              <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold ${getStatusColor(invoice.status)} print:bg-white print:border print:border-gray-300 print:text-gray-800`}>
                 {invoice.status || 'Brouillon'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Client Info */}
-        <div className="mb-8">
-          <h3 className="font-semibold text-gray-900 mb-2">Facturer à:</h3>
-          <p className="text-gray-700 text-sm">
-            {invoice.client?.name || 'Aucun client spécifié'}
-          </p>
-          {invoice.client?.address && (
-            <p className="text-gray-700 text-sm">{invoice.client.address}</p>
-          )}
-          {invoice.client?.email && (
-            <p className="text-gray-700 text-sm">{invoice.client.email}</p>
-          )}
-        </div>
+        <div className="p-8">
+          {/* Company Info */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {settings.company_name || 'Nom Entreprise'}
+            </h2>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p>{settings.company_address || 'Adresse'}</p>
+              <p>Email: {settings.company_email || 'email@example.com'}</p>
+              {settings.company_phone && <p>Tél: {settings.company_phone}</p>}
+              {settings.trade_license && <p>License: {settings.trade_license}</p>}
+              {settings.trn && <p>TRN: {settings.trn}</p>}
+            </div>
+          </div>
 
-        {/* Items Table */}
-        <div className="mb-8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-100 border-y border-gray-300">
-                <th className="text-left py-3 px-4 font-semibold text-gray-900">Description</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900 w-16">Qté</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900 w-24">Prix unitaire</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900 w-16">TVA%</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900 w-24">Montant</th>
-              </tr>
-            </thead>
-            <tbody>
+          {/* Dates and Client Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Dates */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-3">Dates</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Émission:</span>
+                  <span className="font-medium text-gray-900">{formatDate(invoice.issue_date)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Échéance:</span>
+                  <span className="font-medium text-gray-900">{formatDate(invoice.due_date)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Client Info */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-3">Client</h3>
+              <div className="text-sm">
+                <p className="font-medium text-gray-900">
+                  {invoice.client?.name || 'Aucun client spécifié'}
+                </p>
+                {invoice.client?.address && (
+                  <p className="text-gray-600 mt-1">{invoice.client.address}</p>
+                )}
+                {invoice.client?.email && (
+                  <p className="text-gray-600">{invoice.client.email}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Prestations / Items - Card Format */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Prestations</h3>
+            <div className="space-y-4">
               {invoice.items?.map((item, idx) => {
+                const { title, details } = parseItemDescription(item.description);
                 const lineTotal = item.quantity * item.unit_price * (1 + item.vat_rate / 100);
+                
                 return (
-                  <tr key={idx} className="border-b border-gray-200">
-                    <td className="py-3 px-4 text-gray-700">{item.description}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">{item.quantity}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">
-                      {item.unit_price.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-right text-gray-700">{item.vat_rate}%</td>
-                    <td className="py-3 px-4 text-right font-medium text-gray-900">
-                      {lineTotal.toFixed(2)}
-                    </td>
-                  </tr>
+                  <div
+                    key={idx}
+                    className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-900 text-base mb-1">
+                          {title}
+                        </h4>
+                        {details && (
+                          <p className="text-sm text-gray-500 whitespace-pre-wrap">
+                            {details}
+                          </p>
+                        )}
+                      </div>
+                      <div className="ml-4 text-right">
+                        <div className="text-2xl font-bold text-indigo-600">
+                          {lineTotal.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {invoice.currency}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 pt-3 border-t border-gray-200">
+                      <div>
+                        <span className="text-gray-500">Qté:</span>{' '}
+                        <span className="font-medium text-gray-900">{item.quantity}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">P.U:</span>{' '}
+                        <span className="font-medium text-gray-900">
+                          {item.unit_price.toFixed(2)} {invoice.currency}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">TVA:</span>{' '}
+                        <span className="font-medium text-gray-900">{item.vat_rate}%</span>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Totals */}
-        <div className="flex justify-end mb-8">
-          <div className="w-64 space-y-2 border-t border-gray-300 pt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700">Sous-total:</span>
-              <span className="font-medium text-gray-900">
-                {totals.subtotal.toFixed(2)} {invoice.currency}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700">TVA:</span>
-              <span className="font-medium text-gray-900">
-                {totals.totalVat.toFixed(2)} {invoice.currency}
-              </span>
-            </div>
-            <div className="flex justify-between border-t border-gray-300 pt-2">
-              <span className="font-bold text-gray-900">Total TTC:</span>
-              <span className="font-bold text-lg text-indigo-600">
-                {totals.total.toFixed(2)} {invoice.currency}
-              </span>
             </div>
           </div>
-        </div>
 
-        {/* Notes */}
-        {invoice.notes && (
-          <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-semibold text-gray-900 mb-2 text-sm">Notes:</h4>
-            <p className="text-gray-700 text-sm whitespace-pre-wrap">{invoice.notes}</p>
+          {/* Totals */}
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100 mb-8">
+            <div className="space-y-3">
+              <div className="flex justify-between text-base">
+                <span className="text-gray-700">Sous-total</span>
+                <span className="font-medium text-gray-900">
+                  {totals.subtotal.toFixed(2)} {invoice.currency}
+                </span>
+              </div>
+              <div className="flex justify-between text-base">
+                <span className="text-gray-700">TVA totale</span>
+                <span className="font-medium text-gray-900">
+                  {totals.totalVat.toFixed(2)} {invoice.currency}
+                </span>
+              </div>
+              <div className="flex justify-between border-t-2 border-indigo-200 pt-3">
+                <span className="font-bold text-gray-900 text-xl">Total TTC</span>
+                <span className="font-bold text-3xl text-indigo-600">
+                  {totals.total.toFixed(2)} {invoice.currency}
+                </span>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Footer */}
-        <div className="border-t border-gray-300 pt-6 text-center text-sm text-gray-600">
-          <p className="font-semibold text-gray-900 mb-2">Merci pour votre confiance</p>
-          <p>{settings.company_name || 'Nom Entreprise'}</p>
-          {settings.company_email && <p>{settings.company_email}</p>}
+          {/* Notes */}
+          {invoice.notes && (
+            <div className="mb-8 bg-yellow-50 rounded-lg p-5 border border-yellow-200">
+              <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+                Notes
+              </h4>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="border-t-2 border-gray-300 pt-6 text-center">
+            <p className="font-semibold text-gray-900 text-base mb-2">
+              Merci pour votre confiance
+            </p>
+            <p className="text-sm text-gray-600">{settings.company_name || 'Nom Entreprise'}</p>
+            {settings.company_email && (
+              <p className="text-sm text-gray-600">{settings.company_email}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -232,8 +286,17 @@ export default function InvoicePreview({ invoice, settings = {} }) {
           .print\\:rounded-none {
             border-radius: 0;
           }
-          .print\\:p-0 {
-            padding: 0;
+          .print\\:bg-white {
+            background-color: white;
+          }
+          .print\\:border {
+            border-width: 1px;
+          }
+          .print\\:border-gray-300 {
+            border-color: #d1d5db;
+          }
+          .print\\:text-gray-800 {
+            color: #1f2937;
           }
         }
       `}</style>

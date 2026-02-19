@@ -22,6 +22,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.39.0",
+    "@tailwindcss/typography": "^0.5.19",
     "chart.js": "^4.4.0",
     "html2pdf.js": "^0.10.1",
     "lucide-react": "^0.574.0",
@@ -29,7 +30,9 @@
     "openai": "^4.28.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.17",

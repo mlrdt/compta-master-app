@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FileUp, Send, Paperclip, X, ChevronRight, AlertCircle, Loader } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import Modal from '@/components/Modal'
 import InvoiceEditor from '@/components/InvoiceEditor'
 import {
@@ -28,6 +30,13 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const inputRef = useRef(null)
+
+  // Strip invoice_json blocks from markdown content
+  const stripInvoiceJsonBlocks = (content) => {
+    if (!content) return ''
+    // Remove ```invoice_json ... ``` blocks
+    return content.replace(/```invoice_json[\s\S]*?```/g, '').trim()
+  }
 
   // Load chat history on mount
   useEffect(() => {
@@ -371,7 +380,15 @@ export default function ChatPage() {
               )}
 
               {/* Message Content */}
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {message.role === 'user' ? (
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              ) : (
+                <div className="prose prose-sm prose-indigo max-w-none prose-p:my-2 prose-headings:my-2">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {stripInvoiceJsonBlocks(message.content)}
+                  </ReactMarkdown>
+                </div>
+              )}
 
               {/* Invoice Proposal Card */}
               {message.invoice_data && (

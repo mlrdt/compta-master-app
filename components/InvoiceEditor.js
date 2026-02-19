@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 export default function InvoiceEditor({
   invoice = null,
@@ -19,6 +20,7 @@ export default function InvoiceEditor({
       {
         id: Date.now(),
         description: '',
+        details: '',
         quantity: 1,
         unit_price: 0,
         vat_rate: settings.default_vat_rate || 5
@@ -29,16 +31,30 @@ export default function InvoiceEditor({
   // Initialize form with invoice data if editing
   useEffect(() => {
     if (invoice) {
+      // Split description into title and details if contains \n
+      const items = (invoice.items || []).map((item, idx) => {
+        const parts = item.description ? item.description.split('\n') : [''];
+        return {
+          id: Date.now() + idx,
+          description: parts[0] || '',
+          details: parts.slice(1).join('\n') || '',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          vat_rate: item.vat_rate
+        };
+      });
+
       setFormData({
         client_id: invoice.client_id,
         currency: invoice.currency,
         issue_date: invoice.issue_date,
         due_date: invoice.due_date,
         notes: invoice.notes || '',
-        items: invoice.items || [
+        items: items.length > 0 ? items : [
           {
             id: Date.now(),
             description: '',
+            details: '',
             quantity: 1,
             unit_price: 0,
             vat_rate: settings.default_vat_rate || 5
@@ -61,7 +77,10 @@ export default function InvoiceEditor({
       ...prev,
       items: prev.items.map(item =>
         item.id === id
-          ? { ...item, [field]: field === 'description' ? value : parseFloat(value) || 0 }
+          ? { 
+              ...item, 
+              [field]: field === 'description' || field === 'details' ? value : parseFloat(value) || 0 
+            }
           : item
       )
     }));
@@ -71,6 +90,7 @@ export default function InvoiceEditor({
     const newItem = {
       id: Date.now(),
       description: '',
+      details: '',
       quantity: 1,
       unit_price: 0,
       vat_rate: settings.default_vat_rate || 5
@@ -82,6 +102,10 @@ export default function InvoiceEditor({
   };
 
   const removeLineItem = (id) => {
+    if (formData.items.length === 1) {
+      alert('Vous devez avoir au moins un article');
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       items: prev.items.filter(item => item.id !== id)
@@ -120,16 +144,22 @@ export default function InvoiceEditor({
       return;
     }
 
+    // Concatenate description + "\n" + details for storage
+    const itemsForStorage = formData.items.map(({ id, description, details, ...rest }) => ({
+      description: details.trim() ? `${description}\n${details}` : description,
+      ...rest
+    }));
+
     onSave({
       ...formData,
-      items: formData.items.map(({ id, ...item }) => item)
+      items: itemsForStorage
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Client Selection */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Client
@@ -167,7 +197,7 @@ export default function InvoiceEditor({
       </div>
 
       {/* Dates */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Date d'émission
@@ -212,154 +242,184 @@ export default function InvoiceEditor({
         />
       </div>
 
-      {/* Line Items */}
+      {/* Line Items - Card Format */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Articles
         </label>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3">Description</th>
-                <th className="text-right py-2 px-3 w-16">Qté</th>
-                <th className="text-right py-2 px-3 w-24">Prix unitaire</th>
-                <th className="text-right py-2 px-3 w-16">TVA%</th>
-                <th className="text-right py-2 px-3 w-24">Total</th>
-                <th className="w-8"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {formData.items.map(item => {
-                const lineTotal = calculateLineTotal(
-                  item.quantity,
-                  item.unit_price,
-                  item.vat_rate
-                );
-                return (
-                  <tr key={item.id} className="border-b border-gray-100">
-                    <td className="py-2 px-3">
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'description', e.target.value)
-                        }
-                        placeholder="Description"
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs"
-                        required
-                      />
-                    </td>
-                    <td className="py-2 px-3">
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'quantity', e.target.value)
-                        }
-                        step="0.01"
-                        min="0"
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs text-right"
-                        required
-                      />
-                    </td>
-                    <td className="py-2 px-3">
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'unit_price', e.target.value)
-                        }
-                        step="0.01"
-                        min="0"
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs text-right"
-                        required
-                      />
-                    </td>
-                    <td className="py-2 px-3">
-                      <input
-                        type="number"
-                        value={item.vat_rate}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'vat_rate', e.target.value)
-                        }
-                        step="0.1"
-                        min="0"
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs text-right"
-                        required
-                      />
-                    </td>
-                    <td className="py-2 px-3 text-right font-medium text-xs">
+        <div className="space-y-4">
+          {formData.items.map((item, index) => {
+            const lineTotal = calculateLineTotal(
+              item.quantity,
+              item.unit_price,
+              item.vat_rate
+            );
+            return (
+              <div
+                key={item.id}
+                className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow relative"
+              >
+                {/* Remove Button */}
+                <button
+                  type="button"
+                  onClick={() => removeLineItem(item.id)}
+                  className="absolute top-3 right-3 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1 transition-colors"
+                  aria-label="Supprimer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Article number */}
+                <div className="text-sm font-semibold text-gray-500 mb-3">
+                  Article #{index + 1}
+                </div>
+
+                {/* Description */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Description *
+                  </label>
+                  <textarea
+                    value={item.description}
+                    onChange={(e) =>
+                      handleItemChange(item.id, 'description', e.target.value)
+                    }
+                    placeholder="Description de la prestation"
+                    rows="2"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Details (optional) */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Détails (optionnel)
+                  </label>
+                  <textarea
+                    value={item.details}
+                    onChange={(e) =>
+                      handleItemChange(item.id, 'details', e.target.value)
+                    }
+                    placeholder="Détails supplémentaires..."
+                    rows="2"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Quantity, Price, VAT, Total */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Quantité *
+                    </label>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'quantity', e.target.value)
+                      }
+                      step="0.01"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Prix unitaire *
+                    </label>
+                    <input
+                      type="number"
+                      value={item.unit_price}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'unit_price', e.target.value)
+                      }
+                      step="0.01"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      TVA % *
+                    </label>
+                    <input
+                      type="number"
+                      value={item.vat_rate}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'vat_rate', e.target.value)
+                      }
+                      step="0.1"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Total
+                    </label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-indigo-600">
                       {lineTotal.toFixed(2)}
-                    </td>
-                    <td className="py-2 px-3">
-                      <button
-                        type="button"
-                        onClick={() => removeLineItem(item.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
-                        aria-label="Supprimer"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <button
           type="button"
           onClick={addLineItem}
-          className="mt-3 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          className="mt-4 w-full px-4 py-3 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium border border-gray-300"
         >
           + Ajouter une ligne
         </button>
       </div>
 
-      {/* Totals */}
-      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Sous-total</span>
-          <span className="font-medium">{totals.subtotal.toFixed(2)} {formData.currency}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">TVA totale</span>
-          <span className="font-medium">{totals.totalVat.toFixed(2)} {formData.currency}</span>
-        </div>
-        <div className="flex justify-between border-t border-gray-200 pt-2">
-          <span className="font-semibold text-gray-900">Total TTC</span>
-          <span className="font-bold text-lg text-indigo-600">
-            {totals.total.toFixed(2)} {formData.currency}
-          </span>
+      {/* Totals Summary */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100">
+        <h3 className="font-semibold text-gray-900 mb-4 text-lg">Résumé</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-700">Sous-total</span>
+            <span className="font-medium text-gray-900">
+              {totals.subtotal.toFixed(2)} {formData.currency}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-700">TVA totale</span>
+            <span className="font-medium text-gray-900">
+              {totals.totalVat.toFixed(2)} {formData.currency}
+            </span>
+          </div>
+          <div className="flex justify-between border-t border-indigo-200 pt-3">
+            <span className="font-bold text-gray-900 text-lg">Total TTC</span>
+            <span className="font-bold text-2xl text-indigo-600">
+              {totals.total.toFixed(2)} {formData.currency}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t border-gray-200">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
+          className="px-6 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
         >
           Annuler
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-medium"
+          className="px-6 py-3 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-medium"
         >
           Enregistrer
         </button>
