@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) return null;
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 const SYSTEM_PROMPT = `Tu es un assistant comptable expert. Tu aides à créer des factures à partir de documents (bons de commande, contrats, devis, emails, etc.).
 
@@ -96,6 +97,14 @@ export async function POST(request) {
       } else if (msg.role === 'assistant') {
         openaiMessages.push({ role: 'assistant', content: msg.content });
       }
+    }
+
+    const openai = getOpenAI();
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'Client OpenAI non disponible' },
+        { status: 500 }
+      );
     }
 
     const completion = await openai.chat.completions.create({
